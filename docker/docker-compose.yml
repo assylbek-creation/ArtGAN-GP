@@ -1,0 +1,23 @@
+services:
+  train:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: artgan-gp:latest
+    environment:
+      - WANDB_API_KEY=${WANDB_API_KEY}
+      - WANDB_PROJECT=${WANDB_PROJECT:-artgan-gp}
+      - WANDB_ENTITY=${WANDB_ENTITY:-}
+    volumes:
+      - ../data:/workspace/data
+      - ../checkpoints:/workspace/checkpoints
+      - ../outputs:/workspace/outputs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    shm_size: "8gb"
+    command: python -m src.training.train --config-name=baseline

@@ -1,0 +1,8 @@
+project: artgan-gp
+entity: null
+mode: online  # online | offline | disabled
+tags:
+  - wgan-gp
+  - wikiart
+  - 64x64
+log_artifacts: true

@@ -1,0 +1,18 @@
+defaults:
+  - data: wikiart_abstract
+  - model: wgan_gp
+  - training: wgan_gp
+  - wandb: default
+  - _self_
+
+seed: 42
+device: cuda
+output_dir: outputs
+checkpoint_dir: checkpoints
+
+hydra:
+  run:
+    dir: ${output_dir}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra.job.num}

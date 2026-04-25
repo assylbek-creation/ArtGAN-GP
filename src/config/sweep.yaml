@@ -1,0 +1,23 @@
+program: scripts/run_sweep.py
+method: bayes
+metric:
+  name: wasserstein_estimate
+  goal: maximize
+parameters:
+  training.lr_generator:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 5.0e-4
+  training.lr_critic:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 5.0e-4
+  data.batch_size:
+    values: [32, 64, 128]
+  training.lambda_gp:
+    values: [1, 5, 10, 20]
+  training.n_critic:
+    values: [3, 5, 7]
+early_terminate:
+  type: hyperband
+  min_iter: 5

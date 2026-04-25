@@ -1,0 +1,17 @@
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+data/
+checkpoints/
+outputs/
+wandb/
+multirun/
+.hydra/
+notebooks/
+.idea/
+.vscode/
+.DS_Store
