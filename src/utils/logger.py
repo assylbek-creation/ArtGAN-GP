@@ -1,13 +1,16 @@
 """Thin W&B wrapper.
 
 A no-op fallback when ``mode='disabled'`` lets unit tests and quick local
-runs avoid the W&B dependency at runtime. The full MLOps integration
-(artifacts, sweeps) lives on top of this in Phase 4.
+runs avoid the W&B dependency at runtime. Beyond ``log``/``log_images``,
+this module exposes ``log_artifact`` and ``download_artifact`` so the
+training script and the data pipeline can persist datasets, checkpoints,
+and the resolved config through W&B Artifacts.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Protocol
 
 from omegaconf import DictConfig, OmegaConf
@@ -16,6 +19,16 @@ from omegaconf import DictConfig, OmegaConf
 class Logger(Protocol):
     def log(self, metrics: Mapping[str, Any], step: int | None = None) -> None: ...
     def log_images(self, key: str, images: Any, step: int | None = None) -> None: ...
+    def log_artifact(
+        self,
+        path: str | Path,
+        *,
+        name: str,
+        artifact_type: str,
+        metadata: Mapping[str, Any] | None = None,
+        aliases: list[str] | None = None,
+    ) -> None: ...
+    def download_artifact(self, name: str, root: str | Path | None = None) -> Path: ...
     def finish(self) -> None: ...
 
 
@@ -34,6 +47,23 @@ class _NoopLogger:
     def log_images(self, key: str, images: Any, step: int | None = None) -> None:
         del images
         print(f"log_images: {key}{'' if step is None else f' [step={step}]'}")
+
+    def log_artifact(
+        self,
+        path: str | Path,
+        *,
+        name: str,
+        artifact_type: str,
+        metadata: Mapping[str, Any] | None = None,
+        aliases: list[str] | None = None,
+    ) -> None:
+        del metadata, aliases
+        print(f"log_artifact: name={name} type={artifact_type} path={path} (noop)")
+
+    def download_artifact(self, name: str, root: str | Path | None = None) -> Path:
+        raise RuntimeError(
+            "download_artifact is unavailable in disabled mode; provide local files instead."
+        )
 
     def finish(self) -> None:
         pass
@@ -58,6 +88,32 @@ class _WandbLogger:
 
     def log_images(self, key: str, images: Any, step: int | None = None) -> None:
         self._wandb.log({key: self._wandb.Image(images)}, step=step)
+
+    def log_artifact(
+        self,
+        path: str | Path,
+        *,
+        name: str,
+        artifact_type: str,
+        metadata: Mapping[str, Any] | None = None,
+        aliases: list[str] | None = None,
+    ) -> None:
+        target = Path(path)
+        artifact = self._wandb.Artifact(
+            name=name, type=artifact_type, metadata=dict(metadata) if metadata else None
+        )
+        if target.is_dir():
+            artifact.add_dir(str(target))
+        else:
+            artifact.add_file(str(target))
+        self._wandb.log_artifact(artifact, aliases=aliases or None)
+
+    def download_artifact(self, name: str, root: str | Path | None = None) -> Path:
+        run = self._wandb.run
+        if run is None:
+            raise RuntimeError("W&B run not initialized; cannot download artifact.")
+        artifact = run.use_artifact(name)
+        return Path(artifact.download(root=str(root) if root else None))
 
     def finish(self) -> None:
         self._wandb.finish()

@@ -12,3 +12,6 @@ pin_memory: true
 horizontal_flip: true
 normalize_mean: [0.5, 0.5, 0.5]
 normalize_std: [0.5, 0.5, 0.5]
+artifact_name: wikiart_abstract_64
+upload_artifact: false  # set true when running scripts/download_data.py to publish
+max_images: null         # cap for debugging; null = no limit

@@ -10,3 +10,8 @@ sample_every_n_epochs: 1
 checkpoint_every_n_epochs: 5
 fixed_sample_size: 64
 grad_clip_critic: null  # set float to enable
+fid_every_n_epochs: 10
+fid_num_samples: 2000
+fid_feature_dim: 2048
+log_checkpoint_artifact: true
+resume_from: null       # local path or W&B artifact ref like 'entity/proj/checkpoint:v3'

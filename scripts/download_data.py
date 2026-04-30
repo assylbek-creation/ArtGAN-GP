@@ -1,12 +1,16 @@
 """Download a subset of WikiArt and pre-process to fixed-size square PNGs.
 
-Streams ``huggan/wikiart`` from Hugging Face, keeps only the genres listed in the
-data config, and writes ``{image_size}x{image_size}`` RGB PNGs into ``data_root``.
+Streams ``huggan/wikiart`` from Hugging Face, keeps only the genres listed
+in the data config, and writes ``{image_size}x{image_size}`` RGB PNGs into
+``data_root``. With ``data.upload_artifact=true`` the resulting directory
+is also published as a W&B Artifact so sweep workers can pull an identical
+snapshot instead of re-downloading from HF.
 
 Usage::
 
     python -m scripts.download_data
-    python -m scripts.download_data data.image_size=64 data.data_root=data/wikiart_abstract
+    python -m scripts.download_data data.upload_artifact=true
+    python -m scripts.download_data data.max_images=200  # quick smoke run
 """
 
 from __future__ import annotations
@@ -19,6 +23,8 @@ from omegaconf import DictConfig
 from PIL import Image
 from torchvision.transforms import functional as TF
 from tqdm import tqdm
+
+from src.utils.logger import build_logger
 
 
 def _resolve_genre_ids(builder_genre_names: list[str], wanted: list[str]) -> set[int]:
@@ -58,9 +64,12 @@ def main(cfg: DictConfig) -> None:
     print(f"Filtering to genre ids {sorted(genre_ids)} -> {list(data_cfg.genres)}")
 
     stream = load_dataset(data_cfg.hf_dataset, split="train", streaming=True)
+    cap = data_cfg.get("max_images")
 
     saved = 0
     for row in tqdm(stream, desc="streaming wikiart"):
+        if cap is not None and saved >= cap:
+            break
         if row["genre"] not in genre_ids:
             continue
         try:
@@ -72,6 +81,25 @@ def main(cfg: DictConfig) -> None:
         saved += 1
 
     print(f"Saved {saved} images to {out_dir}")
+
+    if data_cfg.get("upload_artifact"):
+        logger = build_logger(cfg)
+        try:
+            logger.log_artifact(
+                out_dir,
+                name=data_cfg.artifact_name,
+                artifact_type="dataset",
+                metadata={
+                    "image_size": data_cfg.image_size,
+                    "genres": list(data_cfg.genres),
+                    "num_images": saved,
+                    "source": data_cfg.hf_dataset,
+                },
+                aliases=["latest"],
+            )
+            print(f"Uploaded artifact '{data_cfg.artifact_name}' with {saved} images.")
+        finally:
+            logger.finish()
 
 
 if __name__ == "__main__":
