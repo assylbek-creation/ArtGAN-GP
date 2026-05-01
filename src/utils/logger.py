@@ -75,13 +75,20 @@ class _WandbLogger:
 
         self._wandb = wandb
         wandb_cfg = cfg.wandb
-        wandb.init(
-            project=wandb_cfg.project,
-            entity=wandb_cfg.entity,
-            mode=wandb_cfg.mode,
-            tags=list(wandb_cfg.tags) if wandb_cfg.tags else None,
-            config=OmegaConf.to_container(cfg, resolve=True),
-        )
+        if wandb.run is None:
+            wandb.init(
+                project=wandb_cfg.project,
+                entity=wandb_cfg.entity,
+                mode=wandb_cfg.mode,
+                tags=list(wandb_cfg.tags) if wandb_cfg.tags else None,
+                config=OmegaConf.to_container(cfg, resolve=True),
+            )
+        else:
+            # A sweep agent (or any outer caller) already started the run.
+            # Merge our resolved config in so the run records what actually executed.
+            wandb.config.update(
+                OmegaConf.to_container(cfg, resolve=True), allow_val_change=True
+            )
 
     def log(self, metrics: Mapping[str, Any], step: int | None = None) -> None:
         self._wandb.log(dict(metrics), step=step)

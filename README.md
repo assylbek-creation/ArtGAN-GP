@@ -79,10 +79,19 @@ python -m src.training.train training.resume_from=checkpoints/epoch_0050.pt
 python -m src.training.train training.resume_from=entity/artgan-gp/wgan_gp_checkpoint:latest
 ```
 
-### 5. Sweep (Phase 5)
+### 5. Sweep
+
+Bayesian search over generator/critic LR, batch size, lambda_gp, and n_critic, optimizing FID. The config is in `src/config/sweep.yaml`.
 
 ```bash
-python scripts/run_sweep.py
+# create + run an agent (default 20 trials)
+python -m scripts.run_sweep --count 20
+
+# join an existing sweep
+python -m scripts.run_sweep --sweep-id <sweep-id> --count 5
+
+# pin a project / entity
+python -m scripts.run_sweep --project artgan-gp --entity my-team
 ```
 
 ### 6. Tests + lint

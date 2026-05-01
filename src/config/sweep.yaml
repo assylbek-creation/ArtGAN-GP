@@ -1,9 +1,11 @@
-program: scripts/run_sweep.py
+name: artgan-gp-bayesian
 method: bayes
 metric:
-  name: wasserstein_estimate
-  goal: maximize
+  name: fid
+  goal: minimize
 parameters:
+  training.epochs:
+    value: 30
   training.lr_generator:
     distribution: log_uniform_values
     min: 1.0e-5
@@ -18,6 +20,10 @@ parameters:
     values: [1, 5, 10, 20]
   training.n_critic:
     values: [3, 5, 7]
+  training.fid_every_n_epochs:
+    value: 5
+  training.fid_num_samples:
+    value: 1000
 early_terminate:
   type: hyperband
   min_iter: 5

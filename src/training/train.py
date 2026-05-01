@@ -57,8 +57,13 @@ def _resolve_checkpoint_path(ref: str, logger) -> Path:
     return files[0]
 
 
-@hydra.main(version_base=None, config_path="../config", config_name="baseline")
-def main(cfg: DictConfig) -> None:
+def run(cfg: DictConfig) -> None:
+    """Run a full training session against a fully-resolved config.
+
+    Split out from ``main`` so the W&B Sweep agent can call this directly
+    after building ``cfg`` from sweep parameters via ``hydra.compose``,
+    without going back through the ``@hydra.main`` decorator.
+    """
     print(OmegaConf.to_yaml(cfg))
     _set_seed(cfg.seed)
     device = _resolve_device(cfg.device)
@@ -181,6 +186,11 @@ def main(cfg: DictConfig) -> None:
                     )
     finally:
         logger.finish()
+
+
+@hydra.main(version_base=None, config_path="../config", config_name="baseline")
+def main(cfg: DictConfig) -> None:
+    run(cfg)
 
 
 if __name__ == "__main__":

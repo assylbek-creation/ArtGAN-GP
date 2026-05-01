@@ -1,4 +1,4 @@
-.PHONY: install test lint format download train train-disabled docker-build docker-train clean
+.PHONY: install test lint format download train train-disabled sweep docker-build docker-train clean
 
 PYTHON ?= python
 
@@ -22,6 +22,9 @@ train:
 
 train-disabled:
 	$(PYTHON) -m src.training.train wandb.mode=disabled
+
+sweep:
+	$(PYTHON) -m scripts.run_sweep --count 20
 
 docker-build:
 	docker compose -f docker/docker-compose.yml build
