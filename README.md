@@ -94,12 +94,42 @@ python -m scripts.run_sweep --sweep-id <sweep-id> --count 5
 python -m scripts.run_sweep --project artgan-gp --entity my-team
 ```
 
-### 6. Tests + lint
+### 6. Sample from a checkpoint
+
+After training, generate images from a checkpoint without re-running the loop:
+
+```bash
+# 8x8 random grid from N(0, I)
+python -m scripts.sample --checkpoint checkpoints/epoch_0100.pt
+
+# Strip of 16 slerp-interpolated frames between two seeds
+python -m scripts.sample --checkpoint checkpoints/epoch_0100.pt \
+    --mode interpolate --seed-a 0 --seed-b 7 --n 16 \
+    --out outputs/interp.png
+
+# 8x8 bilinear-slerp grid between four corner seeds
+python -m scripts.sample --checkpoint checkpoints/epoch_0100.pt \
+    --mode grid --seeds 1 2 3 4 --n 8 --out outputs/grid.png
+```
+
+Or open `notebooks/latent_interpolation.ipynb` for an interactive walk: random samples, slerp paths, slerp grids, and local neighborhood perturbations.
+
+### 7. Tests + lint
 
 ```bash
 make test
 make lint
 ```
+
+## Final deliverables
+
+For the course write-up, the W&B Report should include:
+
+- Final training run with loss curves (critic loss, generator loss, Wasserstein estimate, gradient penalty, critic grad norm) and per-epoch fixed-`z` sample grids.
+- Best FID achieved and the epoch it was reached.
+- Sweep summary table sorted by FID, with the parameter importance plot W&B generates automatically.
+- A few hand-picked sample grids and slerp interpolations from the best checkpoint.
+- Architecture decisions table (Critic uses LayerNorm not BatchNorm, Adam betas (0, 0.9), n_critic=5, lambda_gp from sweep).
 
 ## Project layout
 
@@ -110,8 +140,8 @@ src/
   training/     # train loop, gradient penalty
   utils/        # logger, checkpoints, image grids, metrics (FID)
   config/       # Hydra YAML configs (data / model / training / wandb / sweep)
-scripts/        # download_data.py, run_sweep.py
+scripts/        # download_data.py, run_sweep.py, sample.py
 docker/         # Dockerfile, docker-compose.yml
-tests/          # unit tests (shapes, GP correctness, training smoke)
-notebooks/      # EDA, latent space interpolation (Phase 6)
+tests/          # unit tests (shapes, GP correctness, training smoke, interpolation)
+notebooks/      # latent_interpolation.ipynb
 ```
