@@ -1,16 +1,24 @@
 """Download a subset of WikiArt and pre-process to fixed-size square PNGs.
 
-Streams ``huggan/wikiart`` from Hugging Face, keeps only the genres listed
-in the data config, and writes ``{image_size}x{image_size}`` RGB PNGs into
-``data_root``. With ``data.upload_artifact=true`` the resulting directory
-is also published as a W&B Artifact so sweep workers can pull an identical
-snapshot instead of re-downloading from HF.
+Streams ``huggan/wikiart`` from Hugging Face, keeps only the rows whose
+``data.filter_field`` value matches one of ``data.genres``, and writes
+``{image_size}x{image_size}`` RGB PNGs into ``data_root``. With
+``data.upload_artifact=true`` the resulting directory is also published
+as a W&B Artifact so sweep workers can pull an identical snapshot
+instead of re-downloading from HF.
+
+Note on ``filter_field``: ``huggan/wikiart`` exposes both ``genre``
+(coarse, 11 values like ``abstract_painting``, ``landscape``) and
+``style`` (fine, 27 values including ``Abstract_Expressionism`` and
+``Color_Field_Painting``). Our project filters on **style** by default,
+because that is the granularity that defines our subset.
 
 Usage::
 
     python -m scripts.download_data
     python -m scripts.download_data data.upload_artifact=true
     python -m scripts.download_data data.max_images=200  # quick smoke run
+    python -m scripts.download_data data.filter_field=genre data.genres=[abstract_painting]
 """
 
 from __future__ import annotations
@@ -27,9 +35,9 @@ from tqdm import tqdm
 from src.utils.logger import build_logger
 
 
-def _resolve_genre_ids(builder_genre_names: list[str], wanted: list[str]) -> set[int]:
-    """Map human-readable genre names to integer label ids, tolerating spaces vs underscores."""
-    normalized = {name.lower().replace(" ", "_"): idx for idx, name in enumerate(builder_genre_names)}
+def _resolve_label_ids(label_names: list[str], wanted: list[str], field: str) -> set[int]:
+    """Map human-readable label names to integer ids, tolerating spaces vs underscores."""
+    normalized = {name.lower().replace(" ", "_"): idx for idx, name in enumerate(label_names)}
     ids: set[int] = set()
     missing: list[str] = []
     for name in wanted:
@@ -40,7 +48,8 @@ def _resolve_genre_ids(builder_genre_names: list[str], wanted: list[str]) -> set
             missing.append(name)
     if missing:
         raise ValueError(
-            f"Genres not found in dataset: {missing}. Available: {builder_genre_names}"
+            f"Values for field {field!r} not found in dataset: {missing}. "
+            f"Available {field}s: {label_names}"
         )
     return ids
 
@@ -58,10 +67,16 @@ def main(cfg: DictConfig) -> None:
     out_dir = Path(data_cfg.data_root)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    field = data_cfg.get("filter_field", "style")
     builder = load_dataset_builder(data_cfg.hf_dataset)
-    genre_feature = builder.info.features["genre"]
-    genre_ids = _resolve_genre_ids(genre_feature.names, list(data_cfg.genres))
-    print(f"Filtering to genre ids {sorted(genre_ids)} -> {list(data_cfg.genres)}")
+    if field not in builder.info.features:
+        raise ValueError(
+            f"Dataset {data_cfg.hf_dataset!r} has no feature {field!r}. "
+            f"Available features: {list(builder.info.features)}"
+        )
+    label_feature = builder.info.features[field]
+    label_ids = _resolve_label_ids(label_feature.names, list(data_cfg.genres), field=field)
+    print(f"Filtering by {field}={sorted(label_ids)} -> {list(data_cfg.genres)}")
 
     stream = load_dataset(data_cfg.hf_dataset, split="train", streaming=True)
     cap = data_cfg.get("max_images")
@@ -70,7 +85,7 @@ def main(cfg: DictConfig) -> None:
     for row in tqdm(stream, desc="streaming wikiart"):
         if cap is not None and saved >= cap:
             break
-        if row["genre"] not in genre_ids:
+        if row[field] not in label_ids:
             continue
         try:
             img = _square_resize(row["image"], data_cfg.image_size)
@@ -91,7 +106,8 @@ def main(cfg: DictConfig) -> None:
                 artifact_type="dataset",
                 metadata={
                     "image_size": data_cfg.image_size,
-                    "genres": list(data_cfg.genres),
+                    "filter_field": field,
+                    "labels": list(data_cfg.genres),
                     "num_images": saved,
                     "source": data_cfg.hf_dataset,
                 },

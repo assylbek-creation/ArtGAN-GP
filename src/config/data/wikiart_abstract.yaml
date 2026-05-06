@@ -1,6 +1,7 @@
 name: wikiart_abstract
 hf_dataset: huggan/wikiart
-genres:
+filter_field: style   # 'style' (fine, 27 categories) or 'genre' (coarse, 11)
+genres:               # values of `filter_field` to keep
   - Abstract_Expressionism
   - Color_Field_Painting
 image_size: 64
