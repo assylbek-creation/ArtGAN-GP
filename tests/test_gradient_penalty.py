@@ -86,17 +86,22 @@ def test_shape_mismatch_raises() -> None:
         gradient_penalty(critic, real, fake)
 
 
-def test_per_sample_eps_not_collapsed() -> None:
-    """Indirect: with batch>1 and noisy critic the GP value is non-deterministic.
+class _SumOfSquaresCritic(nn.Module):
+    """f(x_i) = sum(x_i ** 2). ||grad_x_i f(x_i)|| = 2 * ||x_i||, so the
+    penalty depends on the interpolated point and therefore on eps."""
 
-    A buggy implementation that picks a single scalar eps for the whole batch
-    would also be non-deterministic, but it would couple all samples. We
-    cannot easily distinguish those here, so we settle for the smoke check
-    that two consecutive calls give different values, proving the random
-    sampling is at least live.
-    """
+    def forward(self, x: Tensor) -> Tensor:
+        return (x.flatten(1) ** 2).sum(dim=1)
+
+
+def test_per_sample_eps_is_actually_random() -> None:
+    """Two consecutive calls with the same data should give different GP
+    values, proving that eps is sampled fresh per call. We pick a critic
+    whose Jacobian norm depends on the input (sum-of-squares); a critic
+    with a constant Jacobian like _UnitJacobianCritic would mask the
+    randomness."""
     torch.manual_seed(0)
-    critic = _UnitJacobianCritic()
+    critic = _SumOfSquaresCritic()
     real, fake = _fake_batch()
     gp1 = gradient_penalty(critic, real, fake).item()
     gp2 = gradient_penalty(critic, real, fake).item()
